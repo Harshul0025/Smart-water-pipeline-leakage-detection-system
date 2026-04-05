@@ -1,0 +1,93 @@
+int LEAKAGE_PIN = A0;
+int CONTROL_PIN = 3;
+int THRESHOLD = 1000;
+bool flag = false;
+const float signalSpeed = 2.0e8;
+unsigned long returnTime = 0;
+unsigned long start = 0;
+unsigned long start2 = 0;
+int loopcount = 0;
+const float referenceVoltage = 5.0;
+const float knownResistor = 1000.0;
+const float resistancePerMeter = 10.0;
+int i = 0;
+float distancetoLeak = 0.0;
+float firstval = 0.0;
+int l = 0;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(CONTROL_PIN, OUTPUT);
+  pinMode(LEAKAGE_PIN, INPUT);
+  pinMode(13, OUTPUT);
+  pinMode(12, OUTPUT);
+  digitalWrite(CONTROL_PIN, LOW);
+  Serial.println("Leakage Detection System Initialized.");
+  Serial.println("Waiting for sensor readings...");
+}
+
+void loop() {
+  digitalWrite(CONTROL_PIN, HIGH);
+  delay(100);
+  float sensorValue = analogRead(LEAKAGE_PIN);
+  Serial.print("Sensor Voltage: ");
+  Serial.println(sensorValue);
+  
+  if (sensorValue < THRESHOLD) {
+    if (!flag) {
+      flag = true;
+      start = micros();
+      Serial.println("Leakage Detected");
+    }
+    returnTime = micros();
+    if (l == 0) {
+      firstval = micros() - start;
+      float tof = (returnTime - start) / 1e6;
+      distancetoLeak = (signalSpeed * tof) / 400;
+    }
+    l = l + 1;
+    Serial.print("Duration: ");
+    Serial.print((micros() - start) / 1000000);
+    Serial.println(" seconds");
+    Serial.print("distance: ");
+    Serial.println(distancetoLeak);
+    if (sensorValue > 600) {
+      digitalWrite(13, HIGH);
+      digitalWrite(12, LOW);
+      delay(1000);
+    } else {
+      digitalWrite(12, HIGH);
+      digitalWrite(13, LOW);
+      delay(1000);
+    }
+
+    if (Serial.available() > 0) {
+      char command = Serial.read();
+      if (command == 'r') {
+        Serial.println("Resetting flags and timing...");
+        flag = false;
+        loopcount = 0;
+        start = 0;
+      } else if (command == 't') {
+        Serial.println("Threshold value:");
+        Serial.println(THRESHOLD);
+      } else if (command == 'd') {
+        Serial.println("Distance to leak (last calculated):");
+        Serial.print(firstval / 2);
+        Serial.println(" centimeters");
+      }
+    }
+
+    digitalWrite(CONTROL_PIN, LOW);
+    delay(1000);
+  } else {
+    Serial.println("No Leakage Detected");
+    digitalWrite(13, LOW);
+    digitalWrite(12, LOW);
+    start = 0;
+    l = 0;
+    flag = false;
+    loopcount = 0;
+    delay(1000);
+  }
+}
